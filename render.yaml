@@ -1,0 +1,26 @@
+databases:
+  - name: vegili-db
+    plan: free
+    databaseName: vegili
+    user: vegili
+
+services:
+  - type: web
+    name: vegili
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: vegili-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: EMAIL_OTP_DEV_MODE
+        value: "true"
+      - key: APP_BASE_URL
+        value: https://vegili.onrender.com
