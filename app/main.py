@@ -253,25 +253,44 @@ def update_password(data:PasswordIn,db:Session=Depends(db_session),user:User=Dep
     if not pwd.verify(data.current_password,user.password_hash): raise HTTPException(400,"Current password is incorrect")
     user.password_hash=pwd.hash(data.new_password); db.commit(); return {"ok":True}
 
+live_sockets = {}
+
 @app.websocket("/ws/chat/{other_id}")
-async def websocket_chat(ws:WebSocket,other_id:int):
-    await ws.accept()
-    token=ws.cookies.get("vegili_session")
+async def websocket_chat(ws: WebSocket, other_id: int):
+    token = ws.cookies.get("vegili_session")
     try:
-        data=serializer.loads(token or "",max_age=60*60*24*14)
-        uid=int(data["uid"])
+        data = serializer.loads(token or "", max_age=60*60*24*14)
+        uid = int(data["uid"])
     except Exception:
-        await ws.close(code=4401); return
-    db=SessionLocal()
+        await ws.close(code=4401)
+        return
+    db = SessionLocal()
     try:
-        if not are_contacts(db,uid,other_id):
-            await ws.close(code=4403); return
-        await ws.send_json({"type":"ready"})
+        if not are_contacts(db, uid, other_id):
+            await ws.close(code=4403)
+            return
+        await ws.accept()
+        live_sockets.setdefault(uid, set()).add(ws)
+        await ws.send_json({"type": "ready"})
         while True:
-            incoming=await ws.receive_json()
-            body=str(incoming.get("body","")).strip()
-            if not body or len(body)>4000: continue
-            msg=Message(sender_id=uid,receiver_id=other_id,body=body); db.add(msg); db.commit(); db.refresh(msg)
-            await ws.send_json({"type":"message","id":msg.id,"sender_id":uid,"body":msg.body,"created_at":msg.created_at.isoformat()})
-    except WebSocketDisconnect: pass
-    finally: db.close()
+            incoming = await ws.receive_json()
+            body = str(incoming.get("body", "")).strip()
+            if not body or len(body) > 4000:
+                continue
+            msg = Message(sender_id=uid, receiver_id=other_id, body=body)
+            db.add(msg)
+            db.commit()
+            db.refresh(msg)
+            payload = {"type": "message", "id": msg.id, "sender_id": uid, "receiver_id": other_id, "body": msg.body, "created_at": msg.created_at.isoformat()}
+            for peer in list(live_sockets.get(uid, set())) | list(live_sockets.get(other_id, set())):
+                try:
+                    await peer.send_json(payload)
+                except Exception:
+                    pass
+    except WebSocketDisconnect:
+        pass
+    finally:
+        live_sockets.get(uid, set()).discard(ws)
+        if not live_sockets.get(uid):
+            live_sockets.pop(uid, None)
+        db.close()
