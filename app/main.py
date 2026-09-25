@@ -235,7 +235,7 @@ def are_contacts(db,a,b):
 def get_messages(other_id:int,db:Session=Depends(db_session),user:User=Depends(current_user)):
     if not are_contacts(db,user.id,other_id): raise HTTPException(403,"You must be connected to chat")
     rows=db.query(Message).filter(((Message.sender_id==user.id)&(Message.receiver_id==other_id))|((Message.sender_id==other_id)&(Message.receiver_id==user.id))).order_by(Message.created_at.asc()).limit(200).all()
-    return {"messages":[{"id:m.id,"sender_id":m.sender_id,"receiver_id":m.receiver_id,"body":m.body,"created_at":m.created_at.isoformat()} for m in rows]}
+    return {"messages":[{"id":m.id,"sender_id":m.sender_id,"receiver_id":m.receiver_id,"body":m.body,"created_at":m.created_at.isoformat()} for m in rows]}
 @app.post("/api/messages/{other_id}")
 def send_message(other_id:int,data:MessageIn,db:Session=Depends(db_session),user:User=Depends(current_user)):
     if not are_contacts(db,user.id,other_id): raise HTTPException(403,"You must be connected to chat")
