@@ -282,7 +282,7 @@ async def websocket_chat(ws: WebSocket, other_id: int):
             db.commit()
             db.refresh(msg)
             payload = {"type": "message", "id": msg.id, "sender_id": uid, "receiver_id": other_id, "body": msg.body, "created_at": msg.created_at.isoformat()}
-            for peer in list(live_sockets.get(uid, set())) | list(live_sockets.get(other_id, set())):
+            for peer in list(live_sockets.get(uid, set()) | live_sockets.get(other_id, set())):
                 try:
                     await peer.send_json(payload)
                 except Exception:
