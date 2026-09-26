@@ -21,6 +21,6 @@ services:
       - key: COOKIE_SECURE
         value: "true"
       - key: EMAIL_OTP_DEV_MODE
-        value: "true"
+        value: "false"
       - key: APP_BASE_URL
         value: https://vegili.onrender.com
