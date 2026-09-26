@@ -370,7 +370,10 @@ async def websocket_chat(ws: WebSocket, other_id: int):
             incoming = await ws.receive_json()
             if not isinstance(incoming, dict):
                 continue
-            body = str(incoming.get("body", "")).strip()
+            raw_body = incoming.get("body")
+            if not isinstance(raw_body, str):
+                continue
+            body = raw_body.strip()
             if not body or len(body) > 4000:
                 continue
             msg = Message(sender_id=uid, receiver_id=other_id, body=body)
