@@ -103,7 +103,7 @@ def test_feed_breaks_equal_timestamps_by_descending_post_id():
         db.commit()
         db.refresh(user)
         user_id = user.id
-        timestamp = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        timestamp = datetime(2035, 1, 1, tzinfo=timezone.utc)
         posts = [
             Post(user_id=user_id, body=f"tie-item-{i}", created_at=timestamp)
             for i in range(3)
