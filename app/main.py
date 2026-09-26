@@ -26,7 +26,6 @@ pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
 serializer = URLSafeTimedSerializer(os.getenv("SECRET_KEY", "dev-only-change-me"))
 COOKIE_SECURE = os.getenv("COOKIE_SECURE", "false").lower() == "true"
 OTP_DEV = os.getenv("EMAIL_OTP_DEV_MODE", "false").lower() == "true"
-otp_store = {}
 
 class Base(DeclarativeBase): pass
 class User(Base):
@@ -38,6 +37,15 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(255))
     verified: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+class OTPRecord(Base):
+    __tablename__ = "otp_records"
+    email: Mapped[str] = mapped_column(String(255), primary_key=True)
+    code_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    name: Mapped[str] = mapped_column(String(80), nullable=False)
+    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+
 class Post(Base):
     __tablename__ = "posts"
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -193,19 +201,20 @@ def register(data: RegisterIn, db: Session = Depends(db_session)):
     email = str(data.email).lower().strip()
     if db.query(User).filter(func.lower(User.email) == email).first(): raise HTTPException(409, "Email already registered")
     code = f"{secrets.randbelow(1000000):06d}"
-    otp_store[email] = {"code_hash": hashlib.sha256(code.encode()).hexdigest(), "name": data.name.strip(), "password_hash": pwd.hash(data.password), "expires": datetime.now(timezone.utc)+timedelta(minutes=10)}
+    db.merge(OTPRecord(email=email, code_hash=hashlib.sha256(code.encode()).hexdigest(), name=data.name, password_hash=pwd.hash(data.password), expires_at=datetime.now(timezone.utc)+timedelta(minutes=10)))
+    db.commit()
     send_otp(email, code)
     return {"message": "Verification code sent. Check your email.", "dev_code": code if OTP_DEV and not os.getenv("SMTP_HOST") else None}
 
 @app.post("/api/auth/verify")
 def verify(data: VerifyIn, response: Response, db: Session = Depends(db_session)):
     email = str(data.email).lower().strip()
-    record = otp_store.get(email)
-    if not record or record["expires"] < datetime.now(timezone.utc): raise HTTPException(400, "Code expired or not found. Register again.")
-    if not hmac.compare_digest(record["code_hash"], hashlib.sha256(data.code.encode()).hexdigest()): raise HTTPException(400, "Incorrect verification code")
+    record = db.get(OTPRecord, email)
+    if not record or record.expires_at.replace(tzinfo=timezone.utc) < datetime.now(timezone.utc): raise HTTPException(400, "Code expired or not found. Register again.")
+    if not hmac.compare_digest(record.code_hash, hashlib.sha256(data.code.encode()).hexdigest()): raise HTTPException(400, "Incorrect verification code")
     if db.query(User).filter(func.lower(User.email) == email).first(): raise HTTPException(409, "Email already registered")
-    u = User(name=record["name"], email=email, password_hash=record["password_hash"], vegili_id="VGL-"+secrets.token_hex(4).upper(), verified=True)
-    db.add(u); db.commit(); db.refresh(u); otp_store.pop(email, None)
+    u = User(name=record.name, email=email, password_hash=record.password_hash, vegili_id="VGL-"+secrets.token_hex(4).upper(), verified=True)
+    db.add(u); db.delete(record); db.commit(); db.refresh(u)
     response.set_cookie("vegili_session", serializer.dumps({"uid": u.id}), httponly=True, secure=COOKIE_SECURE, samesite="lax", max_age=60*60*24*14)
     return {"user": public_user(u)}
 
