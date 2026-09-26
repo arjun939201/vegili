@@ -18,7 +18,7 @@ Vegili is a social posting and private chat application. This repository contain
 4. Start: `uvicorn app.main:app --reload`
 5. Open http://127.0.0.1:8000
 
-If SMTP settings are not configured, the development OTP is printed to the server log. Configure SMTP before public deployment. Do not use this fallback in production.
+For local development only, set `EMAIL_OTP_DEV_MODE=true` in `.env` to print the verification code to the server log when SMTP is not configured. The application defaults this setting to `false`; configure working SMTP settings for registration to work without the development fallback. Never enable development OTP mode in a public deployment.
 
 ## Render
 The included `render.yaml` describes a web service and managed PostgreSQL database. Add `SECRET_KEY`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` and `APP_BASE_URL` as environment variables in Render. Set `EMAIL_OTP_DEV_MODE=false` once SMTP is configured. The app creates tables on startup for this MVP; use versioned migrations before production scale.
