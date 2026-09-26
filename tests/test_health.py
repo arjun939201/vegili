@@ -55,3 +55,29 @@ def test_ready_returns_503_when_database_query_fails():
         assert response.json() == {"detail": "Database is not ready"}
     finally:
         app.dependency_overrides.clear()
+
+
+def test_current_user_endpoint_rejects_unauthenticated_request():
+    response = client.get("/api/me")
+    assert response.status_code == 401
+    assert response.json() == {"detail": "Please sign in"}
+
+
+def test_current_user_endpoint_rejects_invalid_session_cookie():
+    client.cookies.set("vegili_session", "not-a-valid-session")
+    try:
+        response = client.get("/api/me")
+        assert response.status_code == 401
+    finally:
+        client.cookies.clear()
+
+
+def test_logout_clears_session_cookie():
+    client.cookies.set("vegili_session", "test-session")
+    try:
+        response = client.post("/api/auth/logout")
+        assert response.status_code == 200
+        assert response.json() == {"ok": True}
+        assert "vegili_session" in response.headers.get("set-cookie", "")
+    finally:
+        client.cookies.clear()
