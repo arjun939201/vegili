@@ -93,6 +93,7 @@ def test_websocket_rejects_non_string_message_body():
     sign_in_as(requester_id)
     with client.websocket_connect(f"/ws/chat/{receiver_id}") as websocket:
         assert websocket.receive_json() == {"type": "ready"}
+        websocket.send_json(["not", "an", "object"])
         websocket.send_json({"body": ["not", "a", "string"]})
         websocket.send_json({"body": "valid message"})
         received = websocket.receive_json()
