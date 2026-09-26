@@ -2,6 +2,7 @@ import os, secrets, smtplib, hashlib, hmac
 from datetime import datetime, timedelta, timezone
 from email.message import EmailMessage
 from typing import Optional
+from urllib.parse import urlsplit
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, Depends, HTTPException, Request, Response, WebSocket, WebSocketDisconnect
@@ -363,6 +364,17 @@ live_sockets = {}
 
 @app.websocket("/ws/chat/{other_id}")
 async def websocket_chat(ws: WebSocket, other_id: int):
+    origin = ws.headers.get("origin")
+    host = ws.headers.get("host", "")
+    if origin:
+        parsed_origin = urlsplit(origin)
+        if (
+            parsed_origin.scheme not in {"http", "https"}
+            or not parsed_origin.netloc
+            or parsed_origin.netloc.lower() != host.lower()
+        ):
+            await ws.close(code=1008)
+            return
     token = ws.cookies.get("vegili_session")
     try:
         data = serializer.loads(token or "", max_age=60*60*24*14)
