@@ -409,6 +409,13 @@ def chat_peers(uid: int, other_id: int):
         if chat_partner == uid
     ]
 
+def remove_chat_socket(socket):
+    """Remove a disconnected socket from its owner's live registry."""
+    for uid, sockets in list(live_sockets.items()):
+        sockets.pop(socket, None)
+        if not sockets:
+            live_sockets.pop(uid, None)
+
 @app.websocket("/ws/chat/{other_id}")
 async def websocket_chat(ws: WebSocket, other_id: int):
     origin = ws.headers.get("origin")
@@ -458,7 +465,7 @@ async def websocket_chat(ws: WebSocket, other_id: int):
                 try:
                     await peer.send_json(payload)
                 except Exception:
-                    pass
+                    remove_chat_socket(peer)
     except WebSocketDisconnect:
         pass
     finally:
