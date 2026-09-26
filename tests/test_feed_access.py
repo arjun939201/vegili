@@ -226,3 +226,22 @@ def test_feed_cursor_handles_timestamps_out_of_id_order():
     assert second.json()["posts"][0]["body"] == "older-high-id"
     assert second.json()["has_more"] is False
     client.cookies.clear()
+
+
+def test_feed_rejects_invalid_timestamp_cursor():
+    import secrets
+
+    token = secrets.token_hex(6).upper()
+    db = SessionLocal()
+    try:
+        user = User(name="Invalid Cursor Tester", email=f"invalid-cursor-{token}@example.com", password_hash="unused", vegili_id=f"VGL-INVALID-{token}", verified=True)
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        user_id = user.id
+    finally:
+        db.close()
+    client.cookies.set("vegili_session", serializer.dumps({"uid": user_id}))
+    response = client.get("/api/feed?before_id=10&before_created_at=not-a-timestamp")
+    assert response.status_code == 422
+    client.cookies.clear()
