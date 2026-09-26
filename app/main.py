@@ -229,6 +229,11 @@ def readiness(db: Session = Depends(db_session)):
     return {"status": "ready"}
 
 
+@app.head("/")
+def home_head():
+    return Response(status_code=200)
+
+
 @app.get("/")
 def home(): return FileResponse("app/static/index.html")
 
