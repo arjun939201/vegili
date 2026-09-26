@@ -153,3 +153,31 @@ def test_feed_empty_page_returns_null_cursor():
         "next_before_id": None,
     }
     client.cookies.clear()
+
+
+
+def test_feed_rejects_zero_page_size():
+    import secrets
+
+    token = secrets.token_hex(6).upper()
+    db = SessionLocal()
+    try:
+        user = User(
+            name="Zero Page Tester",
+            email=f"zero-page-{token}@example.com",
+            password_hash="unused",
+            vegili_id=f"VGL-ZERO-{token}",
+            verified=True,
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        user_id = user.id
+    finally:
+        db.close()
+
+    client.cookies.set("vegili_session", serializer.dumps({"uid": user_id}))
+    response = client.get("/api/feed?limit=0")
+    assert response.status_code == 422
+    assert response.json()["detail"] == "limit must be between 1 and 100"
+    client.cookies.clear()
