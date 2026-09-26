@@ -219,7 +219,8 @@ def readiness(db: Session = Depends(db_session)):
 def home(): return FileResponse("app/static/index.html")
 
 @app.post("/api/auth/register")
-def register(data: RegisterIn, db: Session = Depends(db_session)):
+def register(data: RegisterIn, request: Request, db: Session = Depends(db_session)):
+    enforce_rate_limit(request, db, "register", 5, 3600)
     email = str(data.email).lower().strip()
     if db.query(User).filter(func.lower(User.email) == email).first(): raise HTTPException(409, "Email already registered")
     previous_otp = db.get(OTPRecord, email)
@@ -244,7 +245,8 @@ def verify(data: VerifyIn, response: Response, db: Session = Depends(db_session)
     return {"user": public_user(u)}
 
 @app.post("/api/auth/login")
-def login(data: LoginIn, response: Response, db: Session = Depends(db_session)):
+def login(data: LoginIn, response: Response, request: Request, db: Session = Depends(db_session)):
+    enforce_rate_limit(request, db, "login", 10, 900)
     u = db.query(User).filter(func.lower(User.email) == str(data.email).lower().strip()).first()
     if not u or not pwd.verify(data.password, u.password_hash): raise HTTPException(401, "Email or password is incorrect")
     if not u.verified: raise HTTPException(403, "Verify your email first")
