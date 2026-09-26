@@ -131,7 +131,7 @@ class RegisterIn(BaseModel):
 
 class VerifyIn(BaseModel):
     email: EmailStr
-    code: str = Field(pattern=r"^\\d{6}$")
+    code: str = Field(pattern=r"^\d{6}$")
 class LoginIn(BaseModel):
     email: EmailStr
     password: str
