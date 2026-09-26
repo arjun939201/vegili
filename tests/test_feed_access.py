@@ -1,6 +1,8 @@
 import os
 import tempfile
 
+import pytest
+
 _test_db = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
 _test_db.close()
 os.environ["DATABASE_URL"] = f"sqlite:///{_test_db.name}"
@@ -11,6 +13,17 @@ from fastapi.testclient import TestClient
 from app.main import app, SessionLocal, User, Post, serializer
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def isolate_feed_posts():
+    """Keep feed tests independent from rows created by other tests."""
+    db = SessionLocal()
+    try:
+        db.query(Post).delete(synchronize_session=False)
+        db.commit()
+    finally:
+        db.close()
 
 
 def test_feed_requires_authenticated_user():
