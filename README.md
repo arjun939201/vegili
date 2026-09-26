@@ -22,7 +22,7 @@ For local development only, set `EMAIL_OTP_DEV_MODE=true` in `.env` to print the
 
 ## Health check
 
-The lightweight `GET /health` endpoint returns `{"status":"ok"}` when the web process is responding. It is a process-level check and does not verify database or SMTP availability.
+The lightweight `GET /health` endpoint returns `{"status":"ok"}` when the web process is responding. It is a process-level check and does not verify database or SMTP availability. The `GET /ready` endpoint runs a simple database query and returns `503` if the database is unavailable; it does not verify SMTP.
 
 ## Render
 The included `render.yaml` describes a web service and managed PostgreSQL database. Add `SECRET_KEY`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` and `APP_BASE_URL` as environment variables in Render. Set `EMAIL_OTP_DEV_MODE=false` once SMTP is configured. The app creates tables on startup for this MVP; use versioned migrations before production scale.
