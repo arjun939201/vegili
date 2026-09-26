@@ -92,3 +92,15 @@ def test_expired_otp_is_rejected(monkeypatch):
     )
     assert response.status_code == 400
     assert response.json()["detail"] == "Code expired or not found. Register again."
+
+
+
+def test_registration_resend_is_throttled(monkeypatch):
+    enable_test_otp(monkeypatch)
+    payload = register_payload()
+    first = client.post("/api/auth/register", json=payload)
+    assert first.status_code == 200
+
+    second = client.post("/api/auth/register", json=payload)
+    assert second.status_code == 429
+    assert second.json()["detail"] == "Please wait before requesting another verification code"
