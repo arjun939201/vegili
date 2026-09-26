@@ -60,5 +60,25 @@ def test_feed_cursor_pagination_is_stable():
 
 
 def test_feed_rejects_out_of_range_page_size():
+    import secrets
+
+    token = secrets.token_hex(6).upper()
+    db = SessionLocal()
+    try:
+        user = User(
+            name="Page Size Tester",
+            email=f"pagesize-{token}@example.com",
+            password_hash="unused",
+            vegili_id=f"VGL-PAGE-{token}",
+            verified=True,
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        user_id = user.id
+    finally:
+        db.close()
+    client.cookies.set("vegili_session", serializer.dumps({"uid": user_id}))
     response = client.get("/api/feed?limit=101")
     assert response.status_code == 422
+    client.cookies.clear()
