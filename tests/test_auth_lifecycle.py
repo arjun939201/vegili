@@ -1,4 +1,5 @@
 import os
+import hashlib
 import secrets
 import tempfile
 from datetime import datetime, timedelta, timezone
@@ -104,3 +105,31 @@ def test_registration_resend_is_throttled(monkeypatch):
     second = client.post("/api/auth/register", json=payload)
     assert second.status_code == 429
     assert second.json()["detail"] == "Please wait before requesting another verification code"
+
+
+
+def test_login_rate_limit_returns_retry_after():
+    client.cookies.clear()
+    # Isolate this test from other login attempts sharing the test database.
+    bucket = hashlib.sha256(b"login:testclient").hexdigest()
+    with main.SessionLocal() as db:
+        db.query(main.RateLimitEvent).filter(
+            main.RateLimitEvent.bucket == bucket
+        ).delete(synchronize_session=False)
+        db.commit()
+
+    payload = register_payload()
+    for _ in range(10):
+        response = client.post(
+            "/api/auth/login",
+            json={"email": payload["email"], "password": "wrong-password"},
+        )
+        assert response.status_code == 401
+
+    limited = client.post(
+        "/api/auth/login",
+        json={"email": payload["email"], "password": "wrong-password"},
+    )
+    assert limited.status_code == 429
+    assert limited.headers["retry-after"] == "900"
+    assert limited.json()["detail"] == "Too many requests. Please try again later."
