@@ -181,3 +181,46 @@ def test_feed_rejects_zero_page_size():
     assert response.status_code == 422
     assert response.json()["detail"] == "limit must be between 1 and 100"
     client.cookies.clear()
+
+
+def test_feed_cursor_handles_timestamps_out_of_id_order():
+    from datetime import datetime, timezone, timedelta
+    import secrets
+
+    token = secrets.token_hex(6).upper()
+    db = SessionLocal()
+    try:
+        user = User(
+            name="Cursor Order Tester",
+            email=f"cursor-order-{token}@example.com",
+            password_hash="unused",
+            vegili_id=f"VGL-CURSOR-{token}",
+            verified=True,
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        user_id = user.id
+        base = datetime(2036, 1, 1, tzinfo=timezone.utc)
+        # Deliberately make creation IDs and display chronology disagree.
+        posts = [
+            Post(user_id=user_id, body="older-high-id", created_at=base),
+            Post(user_id=user_id, body="newest-low-id", created_at=base + timedelta(days=2)),
+            Post(user_id=user_id, body="middle-mid-id", created_at=base + timedelta(days=1)),
+        ]
+        db.add_all(posts)
+        db.commit()
+    finally:
+        db.close()
+
+    client.cookies.set("vegili_session", serializer.dumps({"uid": user_id}))
+    first = client.get("/api/feed?limit=2")
+    assert [p["body"] for p in first.json()["posts"]] == ["newest-low-id", "middle-mid-id"]
+    cursor_id = first.json()["next_before_id"]
+    cursor_time = first.json()["next_before_created_at"]
+    second = client.get(
+        f"/api/feed?limit=2&before_id={cursor_id}&before_created_at={cursor_time}"
+    )
+    assert [p["body"] for p in second.json()["posts"]] == ["older-high-id"]
+    assert second.json()["has_more"] is False
+    client.cookies.clear()
