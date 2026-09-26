@@ -121,3 +121,35 @@ def test_feed_breaks_equal_timestamps_by_descending_post_id():
     assert [p["id"] for p in data["posts"]] == expected_ids[:2]
     assert data["next_before_id"] == expected_ids[1]
     client.cookies.clear()
+
+
+
+def test_feed_empty_page_returns_null_cursor():
+    import secrets
+
+    token = secrets.token_hex(6).upper()
+    db = SessionLocal()
+    try:
+        user = User(
+            name="Empty Feed Tester",
+            email=f"empty-feed-{token}@example.com",
+            password_hash="unused",
+            vegili_id=f"VGL-EMPTY-{token}",
+            verified=True,
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        user_id = user.id
+    finally:
+        db.close()
+
+    client.cookies.set("vegili_session", serializer.dumps({"uid": user_id}))
+    response = client.get("/api/feed?before_id=1&limit=10")
+    assert response.status_code == 200
+    assert response.json() == {
+        "posts": [],
+        "has_more": False,
+        "next_before_id": None,
+    }
+    client.cookies.clear()
