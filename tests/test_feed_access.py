@@ -65,7 +65,7 @@ def test_feed_cursor_pagination_is_stable():
     assert data["has_more"] is True
     second = client.get(f"/api/feed?limit=2&before_id={data['next_before_id']}&before_created_at={data['next_before_created_at']}")
     assert second.status_code == 200
-    assert "page-item-2" in [p["body"] for p in second.json()["posts"]]
+    assert [p["body"] for p in second.json()["posts"]] == ["page-item-0"]
     assert set(p["id"] for p in data["posts"]).isdisjoint(
         p["id"] for p in second.json()["posts"]
     )
