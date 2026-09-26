@@ -179,6 +179,15 @@ def test_password_change_requires_current_password_and_updates_credentials():
     assert changed.json() == {"ok": True}
 
     client.cookies.clear()
+    # Clear the shared login throttle bucket so this test checks the password,
+    # not accumulated failed-login attempts from earlier tests.
+    bucket = hashlib.sha256(b"login:testclient").hexdigest()
+    with main.SessionLocal() as db:
+        db.query(main.RateLimitEvent).filter(
+            main.RateLimitEvent.bucket == bucket
+        ).delete(synchronize_session=False)
+        db.commit()
+
     old_login = client.post(
         "/api/auth/login",
         json={"email": payload["email"], "password": payload["password"]},
