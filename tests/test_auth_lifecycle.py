@@ -82,7 +82,10 @@ def test_expired_otp_is_rejected(monkeypatch):
     assert registered.status_code == 200
 
     email = payload["email"].lower()
-    main.otp_store[email]["expires"] = datetime.now(timezone.utc) - timedelta(seconds=1)
+    with main.SessionLocal() as db:
+        otp = db.get(main.OTPRecord, email)
+        otp.expires_at = datetime.now(timezone.utc) - timedelta(seconds=1)
+        db.commit()
     response = client.post(
         "/api/auth/verify",
         json={"email": payload["email"], "code": registered.json()["dev_code"]},
