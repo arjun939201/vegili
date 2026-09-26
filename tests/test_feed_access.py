@@ -151,6 +151,7 @@ def test_feed_empty_page_returns_null_cursor():
         "posts": [],
         "has_more": False,
         "next_before_id": None,
+        "next_before_created_at": None,
     }
     client.cookies.clear()
 
