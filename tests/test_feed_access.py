@@ -255,4 +255,7 @@ def test_feed_rejects_invalid_timestamp_cursor():
     client.cookies.set("vegili_session", serializer.dumps({"uid": user_id}))
     response = client.get("/api/feed?before_id=10&before_created_at=not-a-timestamp")
     assert response.status_code == 422
+    # Composite cursors must be supplied as a pair to avoid ambiguous pagination.
+    assert client.get("/api/feed?before_id=10").status_code == 422
+    assert client.get("/api/feed?before_created_at=2026-01-01T00:00:00Z").status_code == 422
     client.cookies.clear()
