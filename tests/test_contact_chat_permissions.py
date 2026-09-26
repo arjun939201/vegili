@@ -1,0 +1,75 @@
+import os
+import tempfile
+
+_test_db = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
+_test_db.close()
+os.environ["DATABASE_URL"] = f"sqlite:///{_test_db.name}"
+os.environ["SECRET_KEY"] = "test-only-secret-key"
+
+from fastapi.testclient import TestClient
+
+from app.main import app, Contact, SessionLocal, User, serializer
+
+client = TestClient(app)
+
+
+def make_users_and_request():
+    db = SessionLocal()
+    try:
+        requester = User(
+            name="Requester",
+            email="requester@example.com",
+            password_hash="not-used-in-this-test",
+            vegili_id="VGL-REQUEST",
+            verified=True,
+        )
+        receiver = User(
+            name="Receiver",
+            email="receiver@example.com",
+            password_hash="not-used-in-this-test",
+            vegili_id="VGL-RECEIVE",
+            verified=True,
+        )
+        db.add_all([requester, receiver])
+        db.commit()
+        db.refresh(requester)
+        db.refresh(receiver)
+        contact = Contact(requester_id=requester.id, receiver_id=receiver.id, accepted=False)
+        db.add(contact)
+        db.commit()
+        db.refresh(contact)
+        return requester.id, receiver.id, contact.id
+    finally:
+        db.close()
+
+
+def sign_in_as(user_id):
+    client.cookies.set("vegili_session", serializer.dumps({"uid": user_id}))
+
+
+def test_contact_acceptance_is_limited_to_recipient():
+    requester_id, receiver_id, contact_id = make_users_and_request()
+    sign_in_as(requester_id)
+
+    response = client.post(f"/api/contacts/{contact_id}/accept")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Request not found"
+
+    sign_in_as(receiver_id)
+    response = client.post(f"/api/contacts/{contact_id}/accept")
+    assert response.status_code == 200
+    assert response.json() == {"ok": True}
+
+
+def test_chat_history_and_send_require_accepted_contact():
+    requester_id, receiver_id, _ = make_users_and_request()
+    sign_in_as(requester_id)
+
+    history = client.get(f"/api/messages/{receiver_id}")
+    sent = client.post(f"/api/messages/{receiver_id}", json={"body": "Hello"})
+
+    assert history.status_code == 403
+    assert sent.status_code == 403
+    assert history.json()["detail"] == "You must be connected to chat"
+    assert sent.json()["detail"] == "You must be connected to chat"
