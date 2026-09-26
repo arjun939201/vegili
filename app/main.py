@@ -8,7 +8,7 @@ from fastapi import FastAPI, Depends, HTTPException, Request, Response, WebSocke
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, EmailStr, Field, field_validator
-from sqlalchemy import create_engine, String, Text, DateTime, ForeignKey, Boolean, UniqueConstraint, func
+from sqlalchemy import create_engine, String, Text, DateTime, ForeignKey, Boolean, UniqueConstraint, func, Index
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker, Session
 from sqlalchemy import text as sql_text
 from passlib.context import CryptContext
@@ -46,6 +46,12 @@ class OTPRecord(Base):
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+
+class RateLimitEvent(Base):
+    __tablename__ = "rate_limit_events"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    bucket: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False, index=True)
 
 class Post(Base):
     __tablename__ = "posts"
@@ -105,6 +111,21 @@ def current_user(request: Request, db: Session = Depends(db_session)):
     user = user_from_cookie(request, db)
     if not user or not user.verified: raise HTTPException(401, "Please sign in")
     return user
+
+def enforce_rate_limit(request: Request, db: Session, action: str, limit: int, window_seconds: int):
+    client_host = request.client.host if request.client else "unknown"
+    bucket = hashlib.sha256(f"{action}:{client_host}".encode()).hexdigest()
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(seconds=window_seconds)
+    db.add(RateLimitEvent(bucket=bucket, created_at=now))
+    db.flush()
+    recent = db.query(RateLimitEvent).filter(RateLimitEvent.bucket == bucket, RateLimitEvent.created_at >= cutoff).count()
+    if recent > limit:
+        db.rollback()
+        raise HTTPException(429, "Too many requests. Please try again later.", headers={"Retry-After": str(window_seconds)})
+    db.commit()
+    db.query(RateLimitEvent).filter(RateLimitEvent.created_at < now - timedelta(days=1)).delete(synchronize_session=False)
+    db.commit()
 
 def public_user(u):
     return {"id": u.id, "vegili_id": u.vegili_id, "name": u.name, "email": u.email}
