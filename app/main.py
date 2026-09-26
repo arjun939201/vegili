@@ -45,6 +45,7 @@ class OTPRecord(Base):
     name: Mapped[str] = mapped_column(String(80), nullable=False)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
 
 class Post(Base):
     __tablename__ = "posts"
@@ -200,6 +201,9 @@ def home(): return FileResponse("app/static/index.html")
 def register(data: RegisterIn, db: Session = Depends(db_session)):
     email = str(data.email).lower().strip()
     if db.query(User).filter(func.lower(User.email) == email).first(): raise HTTPException(409, "Email already registered")
+    previous_otp = db.get(OTPRecord, email)
+    if previous_otp and previous_otp.created_at.replace(tzinfo=timezone.utc) > datetime.now(timezone.utc) - timedelta(seconds=60):
+        raise HTTPException(429, "Please wait before requesting another verification code")
     code = f"{secrets.randbelow(1000000):06d}"
     db.merge(OTPRecord(email=email, code_hash=hashlib.sha256(code.encode()).hexdigest(), name=data.name, password_hash=pwd.hash(data.password), expires_at=datetime.now(timezone.utc)+timedelta(minutes=10)))
     db.commit()
