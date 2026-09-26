@@ -435,7 +435,7 @@ async def websocket_chat(ws: WebSocket, other_id: int):
             await ws.close(code=4403)
             return
         await ws.accept()
-        live_sockets.setdefault(uid, set()).add(ws)
+        live_sockets.setdefault(uid, {})[ws] = other_id
         await ws.send_json({"type": "ready"})
         while True:
             incoming = await ws.receive_json()
