@@ -158,7 +158,7 @@ def test_feed_empty_page_returns_null_cursor():
         db.close()
 
     client.cookies.set("vegili_session", serializer.dumps({"uid": user_id}))
-    response = client.get("/api/feed?before_id=1&limit=10")
+    response = client.get("/api/feed?before_id=1&before_created_at=2026-01-01T00:00:00Z&limit=10")
     assert response.status_code == 200
     assert response.json() == {
         "posts": [],
