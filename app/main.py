@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, Depends, HTTPException, Request, Response, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from sqlalchemy import create_engine, String, Text, DateTime, ForeignKey, Boolean, UniqueConstraint, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker, Session
 from sqlalchemy import text as sql_text
@@ -123,25 +123,52 @@ class RegisterIn(BaseModel):
     name: str = Field(min_length=2, max_length=80)
     email: EmailStr
     password: str = Field(min_length=8, max_length=72)
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def trim_name(cls, value):
+        return value.strip() if isinstance(value, str) else value
+
 class VerifyIn(BaseModel):
     email: EmailStr
-    code: str = Field(min_length=6, max_length=6)
+    code: str = Field(pattern=r"^\\d{6}$")
 class LoginIn(BaseModel):
     email: EmailStr
     password: str
 class PostIn(BaseModel):
     body: str = Field(min_length=1, max_length=4000)
+
+    @field_validator("body", mode="before")
+    @classmethod
+    def trim_body(cls, value):
+        return value.strip() if isinstance(value, str) else value
+
 class CommentIn(BaseModel):
     body: str = Field(min_length=1, max_length=1000)
+
+    @field_validator("body", mode="before")
+    @classmethod
+    def trim_body(cls, value):
+        return value.strip() if isinstance(value, str) else value
 class EmailIn(BaseModel):
     email: EmailStr
 class ProfileIn(BaseModel):
     name: str = Field(min_length=2, max_length=80)
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def trim_name(cls, value):
+        return value.strip() if isinstance(value, str) else value
 class PasswordIn(BaseModel):
     current_password: str
     new_password: str = Field(min_length=8, max_length=72)
 class MessageIn(BaseModel):
     body: str = Field(min_length=1, max_length=4000)
+
+    @field_validator("body", mode="before")
+    @classmethod
+    def trim_body(cls, value):
+        return value.strip() if isinstance(value, str) else value
 
 @app.get("/health")
 def health():
