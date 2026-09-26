@@ -305,6 +305,33 @@ def create_post(data: PostIn, db: Session = Depends(db_session), user: User = De
     p=Post(user_id=user.id,body=data.body.strip())
     db.add(p); db.commit(); db.refresh(p)
     return {"id":p.id}
+@app.patch("/api/posts/{post_id}")
+def update_post(post_id: int, data: PostIn, db: Session = Depends(db_session), user: User = Depends(current_user)):
+    post = db.get(Post, post_id)
+    if not post:
+        raise HTTPException(404, "Post not found")
+    if post.user_id != user.id:
+        raise HTTPException(403, "You can only edit your own posts")
+    post.body = data.body
+    db.commit()
+    return {"id": post.id, "body": post.body}
+
+
+@app.delete("/api/posts/{post_id}")
+def delete_post(post_id: int, db: Session = Depends(db_session), user: User = Depends(current_user)):
+    post = db.get(Post, post_id)
+    if not post:
+        raise HTTPException(404, "Post not found")
+    if post.user_id != user.id:
+        raise HTTPException(403, "You can only delete your own posts")
+    # Remove dependent rows explicitly for databases without cascading FK deletes.
+    db.query(Comment).filter(Comment.post_id == post_id).delete(synchronize_session=False)
+    db.query(Like).filter(Like.post_id == post_id).delete(synchronize_session=False)
+    db.delete(post)
+    db.commit()
+    return {"ok": True}
+
+
 @app.post("/api/posts/{post_id}/like")
 def like(post_id:int, db:Session=Depends(db_session), user:User=Depends(current_user)):
     p=db.get(Post,post_id)
