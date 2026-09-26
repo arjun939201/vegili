@@ -1,4 +1,4 @@
-import os, secrets, smtplib, hashlib, hmac
+import os, secrets, smtplib, hashlib, hmac, logging
 from datetime import datetime, timedelta, timezone
 from email.message import EmailMessage
 from typing import Optional
@@ -27,6 +27,7 @@ pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
 serializer = URLSafeTimedSerializer(os.getenv("SECRET_KEY", "dev-only-change-me"))
 COOKIE_SECURE = os.getenv("COOKIE_SECURE", "false").lower() == "true"
 OTP_DEV = os.getenv("EMAIL_OTP_DEV_MODE", "false").lower() == "true"
+logger = logging.getLogger(__name__)
 
 class Base(DeclarativeBase): pass
 class User(Base):
@@ -161,7 +162,9 @@ def send_otp(email, code):
             server.starttls()
             server.login(os.getenv("SMTP_USER", ""), os.getenv("SMTP_PASSWORD", ""))
             server.send_message(msg)
-    except Exception:
+    except Exception as exc:
+        # Log only the exception class: SMTP exception messages may contain sensitive server details.
+        logger.error("Verification email delivery failed (%s)", type(exc).__name__)
         raise HTTPException(503, "Could not send verification email")
 
 class RegisterIn(BaseModel):
