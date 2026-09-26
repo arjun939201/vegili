@@ -37,7 +37,8 @@ def test_feed_cursor_pagination_is_stable():
         db.commit()
         db.refresh(user)
         user_id = user.id
-        posts = [Post(user_id=user_id, body=f"page-item-{i}") for i in range(3)]
+        from datetime import datetime, timezone
+        posts = [Post(user_id=user_id, body=f"page-item-{i}", created_at=datetime(2105, 1, 1, tzinfo=timezone.utc)) for i in range(3)]
         db.add_all(posts)
         db.commit()
     finally:
@@ -202,7 +203,7 @@ def test_feed_cursor_handles_timestamps_out_of_id_order():
         db.commit()
         db.refresh(user)
         user_id = user.id
-        base = datetime(2099, 1, 1, tzinfo=timezone.utc)
+        base = datetime(2102, 1, 1, tzinfo=timezone.utc)
         # Deliberately make creation IDs and display chronology disagree.
         posts = [
             Post(user_id=user_id, body="older-high-id", created_at=base),
