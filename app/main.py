@@ -440,7 +440,18 @@ async def websocket_chat(ws: WebSocket, other_id: int):
             db.commit()
             db.refresh(msg)
             payload = {"type": "message", "id": msg.id, "sender_id": uid, "receiver_id": other_id, "body": msg.body, "created_at": msg.created_at.isoformat()}
-            for peer in list(live_sockets.get(uid, set()) | live_sockets.get(other_id, set())):
+            # A user may have several chat tabs open. Deliver only to sockets
+            # subscribed to this exact pair, never to their other conversations.
+            peers = [
+                peer
+                for peer, chat_partner in live_sockets.get(uid, {}).items()
+                if chat_partner == other_id
+            ] + [
+                peer
+                for peer, chat_partner in live_sockets.get(other_id, {}).items()
+                if chat_partner == uid
+            ]
+            for peer in peers:
                 try:
                     await peer.send_json(payload)
                 except Exception:
@@ -448,7 +459,7 @@ async def websocket_chat(ws: WebSocket, other_id: int):
     except WebSocketDisconnect:
         pass
     finally:
-        live_sockets.get(uid, set()).discard(ws)
+        live_sockets.get(uid, {}).pop(ws, None)
         if not live_sockets.get(uid):
             live_sockets.pop(uid, None)
         db.close()
