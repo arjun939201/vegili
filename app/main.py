@@ -91,6 +91,19 @@ class Message(Base):
 if os.getenv("VEGILI_SKIP_CREATE_ALL", "false").lower() != "true":
     Base.metadata.create_all(engine)
 app = FastAPI(title="Vegili", version="0.1.0")
+
+@app.middleware("http")
+async def protect_cookie_writes(request: Request, call_next):
+    # Browsers attach Origin to cross-origin fetches; reject foreign origins
+    # on state-changing requests while preserving non-browser API clients.
+    if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
+        origin = request.headers.get("origin")
+        if origin:
+            expected = f"{request.url.scheme}://{request.url.netloc}"
+            if origin.rstrip("/") != expected.rstrip("/"):
+                return Response("Cross-origin request blocked", status_code=403)
+    return await call_next(request)
+
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 def db_session():
