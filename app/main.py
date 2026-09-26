@@ -73,7 +73,8 @@ class Message(Base):
     body: Mapped[str] = mapped_column(String(4000))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
-Base.metadata.create_all(engine)
+if os.getenv("VEGILI_SKIP_CREATE_ALL", "false").lower() != "true":
+    Base.metadata.create_all(engine)
 app = FastAPI(title="Vegili", version="0.1.0")
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
