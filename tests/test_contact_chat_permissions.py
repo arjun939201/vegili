@@ -75,3 +75,25 @@ def test_chat_history_and_send_require_accepted_contact():
     assert sent.status_code == 403
     assert history.json()["detail"] == "You must be connected to chat"
     assert sent.json()["detail"] == "You must be connected to chat"
+
+
+
+def test_websocket_rejects_non_string_message_body():
+    requester_id, receiver_id, contact_id = make_users_and_request()
+    db = SessionLocal()
+    try:
+        contact = db.get(Contact, contact_id)
+        contact.accepted = True
+        db.commit()
+    finally:
+        db.close()
+
+    sign_in_as(requester_id)
+    with client.websocket_connect(f"/ws/chat/{receiver_id}") as websocket:
+        assert websocket.receive_json() == {"type": "ready"}
+        websocket.send_json({"body": ["not", "a", "string"]})
+        websocket.send_json({"body": "valid message"})
+        received = websocket.receive_json()
+        assert received["type"] == "message"
+        assert received["body"] == "valid message"
+        assert received["sender_id"] == requester_id
