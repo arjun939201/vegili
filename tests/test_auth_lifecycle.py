@@ -133,3 +133,14 @@ def test_login_rate_limit_returns_retry_after():
     assert limited.status_code == 429
     assert limited.headers["retry-after"] == "900"
     assert limited.json()["detail"] == "Too many requests. Please try again later."
+
+
+
+def test_cross_origin_write_is_rejected():
+    response = client.post(
+        "/api/auth/logout",
+        json={},
+        headers={"Origin": "https://attacker.example"},
+    )
+    assert response.status_code == 403
+    assert response.text == "Cross-origin request blocked"
