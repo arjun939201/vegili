@@ -1,6 +1,8 @@
 import os
 import tempfile
 import secrets
+import pytest
+from starlette.websockets import WebSocketDisconnect
 
 _test_db = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
 _test_db.close()
@@ -97,3 +99,23 @@ def test_websocket_rejects_non_string_message_body():
         assert received["type"] == "message"
         assert received["body"] == "valid message"
         assert received["sender_id"] == requester_id
+
+
+
+def test_websocket_rejects_foreign_origin():
+    requester_id, receiver_id, contact_id = make_users_and_request()
+    db = SessionLocal()
+    try:
+        contact = db.get(Contact, contact_id)
+        contact.accepted = True
+        db.commit()
+    finally:
+        db.close()
+
+    sign_in_as(requester_id)
+    with pytest.raises(WebSocketDisconnect):
+        with client.websocket_connect(
+            f"/ws/chat/{receiver_id}",
+            headers={"origin": "https://attacker.example"},
+        ):
+            pass
