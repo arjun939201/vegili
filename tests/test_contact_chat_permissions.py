@@ -152,3 +152,22 @@ def test_disconnected_chat_socket_is_pruned_from_registry():
         assert live_sockets == {10: {active: 30}}
     finally:
         live_sockets.clear()
+
+def test_websocket_disconnect_cleans_up_live_socket_registry():
+    from app.main import live_sockets
+
+    requester_id, receiver_id, contact_id = make_users_and_request()
+    db = SessionLocal()
+    try:
+        contact = db.get(Contact, contact_id)
+        contact.accepted = True
+        db.commit()
+    finally:
+        db.close()
+
+    sign_in_as(requester_id)
+    with client.websocket_connect(f"/ws/chat/{receiver_id}") as websocket:
+        assert websocket.receive_json() == {"type": "ready"}
+        assert websocket in live_sockets[requester_id]
+
+    assert requester_id not in live_sockets
