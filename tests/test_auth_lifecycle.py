@@ -144,3 +144,49 @@ def test_cross_origin_write_is_rejected():
     )
     assert response.status_code == 403
     assert response.text == "Cross-origin request blocked"
+
+
+
+def test_password_change_requires_current_password_and_updates_credentials():
+    client.cookies.clear()
+    payload = register_payload()
+    user = main.User(
+        name=payload["name"],
+        email=payload["email"],
+        password_hash=main.pwd.hash(payload["password"]),
+        vegili_id="VGL-PW-" + secrets.token_hex(4).upper(),
+        verified=True,
+    )
+    with main.SessionLocal() as db:
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        user_id = user.id
+
+    client.cookies.set("vegili_session", main.serializer.dumps({"uid": user_id}))
+    rejected = client.patch(
+        "/api/settings/password",
+        json={"current_password": "incorrect-password", "new_password": "new-safe-password"},
+    )
+    assert rejected.status_code == 400
+    assert rejected.json()["detail"] == "Current password is incorrect"
+
+    changed = client.patch(
+        "/api/settings/password",
+        json={"current_password": payload["password"], "new_password": "new-safe-password"},
+    )
+    assert changed.status_code == 200
+    assert changed.json() == {"ok": True}
+
+    client.cookies.clear()
+    old_login = client.post(
+        "/api/auth/login",
+        json={"email": payload["email"], "password": payload["password"]},
+    )
+    assert old_login.status_code == 401
+    new_login = client.post(
+        "/api/auth/login",
+        json={"email": payload["email"], "password": "new-safe-password"},
+    )
+    assert new_login.status_code == 200
+    client.cookies.clear()
