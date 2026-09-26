@@ -10,6 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import create_engine, String, Text, DateTime, ForeignKey, Boolean, UniqueConstraint, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker, Session
+from sqlalchemy import text as sql_text
 from passlib.context import CryptContext
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 
@@ -145,6 +146,15 @@ class MessageIn(BaseModel):
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+@app.get("/ready")
+def readiness(db: Session = Depends(db_session)):
+    try:
+        db.execute(sql_text("SELECT 1"))
+    except Exception:
+        raise HTTPException(503, "Database is not ready")
+    return {"status": "ready"}
 
 
 @app.get("/")
