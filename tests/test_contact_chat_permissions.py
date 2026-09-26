@@ -136,3 +136,18 @@ def test_chat_peer_selection_is_limited_to_matching_partner():
         assert chat_peers(10, 30) == [other_pair]
     finally:
         live_sockets.clear()
+
+def test_disconnected_chat_socket_is_pruned_from_registry():
+    from app.main import live_sockets, remove_chat_socket
+
+    stale = object()
+    active = object()
+    live_sockets.clear()
+    live_sockets[10] = {stale: 20, active: 30}
+    live_sockets[20] = {stale: 10}
+
+    try:
+        remove_chat_socket(stale)
+        assert live_sockets == {10: {active: 30}}
+    finally:
+        live_sockets.clear()
