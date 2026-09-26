@@ -291,6 +291,8 @@ def feed(
 ):
     if limit < 1 or limit > 100:
         raise HTTPException(422, "limit must be between 1 and 100")
+    if (before_id is None) != (before_created_at is None):
+        raise HTTPException(422, "before_id and before_created_at must be provided together")
     query = db.query(Post, User).join(User, User.id == Post.user_id)
     if before_created_at is not None and before_id is not None:
         query = query.filter(or_(Post.created_at < before_created_at, and_(Post.created_at == before_created_at, Post.id < before_id)))
