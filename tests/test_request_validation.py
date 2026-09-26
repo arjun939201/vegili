@@ -8,7 +8,7 @@ os.environ["SECRET_KEY"] = "test-only-secret-key"
 
 from fastapi.testclient import TestClient
 
-from app.main import app
+from app.main import app, RegisterIn, VerifyIn, PostIn, CommentIn, ProfileIn, MessageIn
 
 client = TestClient(app)
 
@@ -56,3 +56,42 @@ def test_verification_rejects_code_with_wrong_length():
         json={"email": "valid@example.com", "code": "123"},
     )
     assert response.status_code == 422
+
+
+def test_registration_rejects_whitespace_only_name():
+    response = client.post(
+        "/api/auth/register",
+        json={"name": "   ", "email": "spaces@example.com", "password": "long-enough-password"},
+    )
+    assert response.status_code == 422
+
+
+def test_verification_rejects_non_numeric_six_character_code():
+    response = client.post(
+        "/api/auth/verify",
+        json={"email": "valid@example.com", "code": "12ab56"},
+    )
+    assert response.status_code == 422
+
+
+def test_text_models_reject_whitespace_only_content():
+    import pytest
+    from pydantic import ValidationError
+
+    for model in (PostIn, CommentIn, MessageIn):
+        with pytest.raises(ValidationError):
+            model.model_validate({"body": "   "})
+
+
+def test_profile_model_rejects_whitespace_only_name():
+    import pytest
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        ProfileIn.model_validate({"name": "   "})
+
+
+def test_text_models_trim_surrounding_whitespace():
+    assert PostIn.model_validate({"body": "  hello  "}).body == "hello"
+    assert CommentIn.model_validate({"body": "  hello  "}).body == "hello"
+    assert MessageIn.model_validate({"body": "  hello  "}).body == "hello"
