@@ -1,5 +1,6 @@
 import os
 import tempfile
+import secrets
 
 _test_db = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
 _test_db.close()
@@ -16,18 +17,19 @@ client = TestClient(app)
 def make_users_and_request():
     db = SessionLocal()
     try:
+        unique = secrets.token_hex(6).upper()
         requester = User(
             name="Requester",
-            email="requester@example.com",
+            email=f"requester-{unique}@example.com",
             password_hash="not-used-in-this-test",
-            vegili_id="VGL-REQUEST",
+            vegili_id=f"VGL-REQ-{unique}",
             verified=True,
         )
         receiver = User(
             name="Receiver",
-            email="receiver@example.com",
+            email=f"receiver-{unique}@example.com",
             password_hash="not-used-in-this-test",
-            vegili_id="VGL-RECEIVE",
+            vegili_id=f"VGL-REC-{unique}",
             verified=True,
         )
         db.add_all([requester, receiver])
