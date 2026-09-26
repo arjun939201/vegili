@@ -209,3 +209,28 @@ def test_password_change_rejects_missing_session():
     )
     assert response.status_code == 401
     assert response.json()["detail"] == "Please sign in"
+
+
+def test_password_change_rejects_too_short_new_password():
+    client.cookies.clear()
+    payload = register_payload()
+    user = main.User(
+        name=payload["name"],
+        email=payload["email"],
+        password_hash=main.pwd.hash(payload["password"]),
+        vegili_id="VGL-SHORT-" + secrets.token_hex(4).upper(),
+        verified=True,
+    )
+    with main.SessionLocal() as db:
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        user_id = user.id
+
+    client.cookies.set("vegili_session", main.serializer.dumps({"uid": user_id}))
+    response = client.patch(
+        "/api/settings/password",
+        json={"current_password": payload["password"], "new_password": "short"},
+    )
+    assert response.status_code == 422
+    client.cookies.clear()
