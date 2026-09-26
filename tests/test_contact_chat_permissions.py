@@ -119,3 +119,20 @@ def test_websocket_rejects_foreign_origin():
             headers={"origin": "https://attacker.example"},
         ):
             pass
+
+
+def test_chat_peer_selection_is_limited_to_matching_partner():
+    from app.main import chat_peers, live_sockets
+
+    first = object()
+    other_pair = object()
+    reverse_pair = object()
+    live_sockets.clear()
+    live_sockets[10] = {first: 20, other_pair: 30}
+    live_sockets[20] = {reverse_pair: 10}
+
+    try:
+        assert chat_peers(10, 20) == [first, reverse_pair]
+        assert chat_peers(10, 30) == [other_pair]
+    finally:
+        live_sockets.clear()
