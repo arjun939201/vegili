@@ -273,12 +273,24 @@ def logout(response: Response):
 def me(user: User = Depends(current_user)): return {"user": public_user(user)}
 
 @app.get("/api/feed")
-def feed(db: Session = Depends(db_session), user: User = Depends(current_user)):
-    rows = db.query(Post, User).join(User, User.id == Post.user_id).order_by(Post.created_at.desc()).limit(100).all()
+def feed(
+    before_id: Optional[int] = None,
+    limit: int = 30,
+    db: Session = Depends(db_session),
+    user: User = Depends(current_user),
+):
+    if limit < 1 or limit > 100:
+        raise HTTPException(422, "limit must be between 1 and 100")
+    query = db.query(Post, User).join(User, User.id == Post.user_id)
+    if before_id is not None:
+        query = query.filter(Post.id < before_id)
+    rows = query.order_by(Post.created_at.desc(), Post.id.desc()).limit(limit + 1).all()
+    has_more = len(rows) > limit
+    rows = rows[:limit]
     out=[]
     for p, author in rows:
         out.append({"id":p.id,"body":p.body,"created_at":p.created_at.isoformat(),"author":public_user(author),"likes":db.query(Like).filter_by(post_id=p.id).count(),"liked":db.query(Like).filter_by(post_id=p.id,user_id=user.id).first() is not None,"comments":[{"id":c.id,"body":c.body,"author":db.get(User,c.user_id).name} for c in db.query(Comment).filter_by(post_id=p.id).order_by(Comment.created_at.asc()).all()]})
-    return {"posts":out}
+    return {"posts":out,"has_more":has_more,"next_before_id":rows[-1][0].id if rows else None}
 @app.post("/api/posts")
 def create_post(data: PostIn, db: Session = Depends(db_session), user: User = Depends(current_user)):
     p=Post(user_id=user.id,body=data.body.strip())
