@@ -199,3 +199,13 @@ def test_password_change_requires_current_password_and_updates_credentials():
     )
     assert new_login.status_code == 200
     client.cookies.clear()
+
+
+def test_password_change_rejects_missing_session():
+    client.cookies.clear()
+    response = client.patch(
+        "/api/settings/password",
+        json={"current_password": "old-password", "new_password": "new-password-123"},
+    )
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Please sign in"
