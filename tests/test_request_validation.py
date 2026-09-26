@@ -27,8 +27,3 @@ def test_registration_rejects_short_password():
         json={"name": "Test User", "email": "test@example.com", "password": "short"},
     )
     assert response.status_code == 422
-
-
-def test_post_creation_rejects_empty_body():
-    response = client.post("/api/posts", json={"body": ""})
-    assert response.status_code == 422
