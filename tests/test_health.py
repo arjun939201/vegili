@@ -81,3 +81,9 @@ def test_logout_clears_session_cookie():
         assert "vegili_session" in response.headers.get("set-cookie", "")
     finally:
         client.cookies.clear()
+
+
+def test_render_head_probe_returns_success():
+    response = client.head("/")
+    assert response.status_code == 200
+    assert response.content == b""
