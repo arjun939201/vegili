@@ -168,6 +168,6 @@ def test_websocket_disconnect_cleans_up_live_socket_registry():
     sign_in_as(requester_id)
     with client.websocket_connect(f"/ws/chat/{receiver_id}") as websocket:
         assert websocket.receive_json() == {"type": "ready"}
-        assert websocket in live_sockets[requester_id]
+        assert list(live_sockets[requester_id].values()) == [receiver_id]
 
     assert requester_id not in live_sockets
