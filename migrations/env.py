@@ -2,6 +2,7 @@ from logging.config import fileConfig
 import os
 from alembic import context
 from sqlalchemy import engine_from_config, pool
+os.environ["VEGILI_SKIP_CREATE_ALL"] = "true"
 from app.main import Base
 
 config = context.config
