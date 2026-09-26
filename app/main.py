@@ -142,6 +142,11 @@ class PasswordIn(BaseModel):
 class MessageIn(BaseModel):
     body: str = Field(min_length=1, max_length=4000)
 
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
+
 @app.get("/")
 def home(): return FileResponse("app/static/index.html")
 
