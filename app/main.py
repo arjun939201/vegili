@@ -24,7 +24,7 @@ SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False
 pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
 serializer = URLSafeTimedSerializer(os.getenv("SECRET_KEY", "dev-only-change-me"))
 COOKIE_SECURE = os.getenv("COOKIE_SECURE", "false").lower() == "true"
-OTP_DEV = os.getenv("EMAIL_OTP_DEV_MODE", "true").lower() == "true"
+OTP_DEV = os.getenv("EMAIL_OTP_DEV_MODE", "false").lower() == "true"
 otp_store = {}
 
 class Base(DeclarativeBase): pass
